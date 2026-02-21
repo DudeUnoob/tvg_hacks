@@ -206,9 +206,13 @@ class CsvSportsEventsAdapter:
         candidate = Path(path_value).expanduser()
         if candidate.exists():
             return candidate
-        backend_candidate = Path(__file__).resolve().parents[2] / path_value
+        backend_root = Path(__file__).resolve().parents[2]
+        backend_candidate = backend_root / candidate
         if backend_candidate.exists():
             return backend_candidate
+        repo_candidate = backend_root.parent / candidate
+        if repo_candidate.exists():
+            return repo_candidate
         return candidate
 
     def _load_capacity_map(self) -> dict[str, int]:

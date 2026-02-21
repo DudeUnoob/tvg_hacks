@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 
 from app.config import Settings
 from app.services.energy_lookup import EnergyLookupService
@@ -9,6 +10,7 @@ def _build_service() -> EnergyLookupService:
         Settings(
             energy_lookup_enabled=True,
             comprehensive_energy_lookup_csv_path="data/comprehensive_energy_lookup_5deg.csv",
+            facility_energy_csv_path="data/Facility_Energy_Usage.csv",
         )
     )
 
@@ -60,3 +62,27 @@ def test_energy_lookup_falls_back_for_unknown_venue() -> None:
     assert profile.base_kwh is None
     assert profile.weather_multiplier == pytest.approx(1.42)
     assert profile.venue_intensity_factor == pytest.approx(1.0)
+
+
+def test_energy_lookup_uses_facility_energy_for_intensity_factor() -> None:
+    service = _build_service()
+    dkr_profile = service.get_profile("DKR-Texas Memorial Stadium", 95)
+    moody_profile = service.get_profile("Moody Center", 95)
+    weller_profile = service.get_profile("Weller Tennis Center", 95)
+
+    assert dkr_profile.source == "comprehensive_csv"
+    assert dkr_profile.venue_intensity_factor == pytest.approx(1.8, rel=1e-6)
+    assert moody_profile.venue_intensity_factor == pytest.approx(0.9272727, rel=1e-6)
+    assert weller_profile.venue_intensity_factor == pytest.approx(0.6, rel=1e-6)
+    assert dkr_profile.venue_intensity_factor > moody_profile.venue_intensity_factor > weller_profile.venue_intensity_factor
+
+
+def test_energy_lookup_path_resolution_supports_repo_root_from_backend_cwd(monkeypatch) -> None:
+    backend_root = Path(__file__).resolve().parents[1]
+    monkeypatch.chdir(backend_root)
+
+    service = _build_service()
+    profile = service.get_profile("Moody Center", 65)
+
+    assert service.loaded_venue_count >= 10
+    assert profile.source == "comprehensive_csv"

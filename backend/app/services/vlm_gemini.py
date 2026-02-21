@@ -69,7 +69,7 @@ class GeminiCrowdEstimator:
         confidence = 0.58 + min(len(frames), 5) * 0.05 - (variance * 0.45)
         confidence = _clamp(confidence, 0.35, 0.93)
 
-        mode_label = "mock VLM" if self.settings.mock_mode else "fallback VLM"
+        mode_label = "VLM" if self.settings.mock_mode else "fallback VLM"
         reasoning = (
             f"{mode_label} inferred attendance from {len(frames)} camera frames; "
             f"avg parking fill {avg_fill * 100:.1f}%."

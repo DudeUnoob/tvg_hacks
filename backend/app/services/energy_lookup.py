@@ -29,16 +29,22 @@ class EnergyLookupService:
         self.settings = settings
         self.enabled = settings.energy_lookup_enabled
         self.lookup_csv_path = settings.comprehensive_energy_lookup_csv_path
+        self.facility_energy_csv_path = settings.facility_energy_csv_path
 
         self._curves: dict[str, _VenueCurve] = {}
         self._base_kwh_median: float = 0.0
         self._min_temp_f = self._default_min_temp_f
         self._max_temp_f = self._default_max_temp_f
+        self._facility_intensity_factors: dict[str, float] = {}
         self._aliases_normalized = {
             self._normalize_venue(raw_key): self._normalize_venue(raw_value)
             for raw_key, raw_value in self._alias_map.items()
         }
+        self._reverse_aliases_normalized = {
+            value: key for key, value in self._aliases_normalized.items()
+        }
         self._load_csv()
+        self._load_facility_energy_index()
 
     @property
     def loaded_venue_count(self) -> int:
@@ -60,7 +66,11 @@ class EnergyLookupService:
         lower_bin_f, upper_bin_f, interpolated_kwh = self._interpolate(curve=curve, temperature_f=temperature_clamped)
         base_kwh = max(curve.base_kwh, 0.0)
         weather_multiplier = (interpolated_kwh / base_kwh) if base_kwh > 0 else 1.0
-        venue_intensity_factor = (base_kwh / self._base_kwh_median) if self._base_kwh_median > 0 else 1.0
+        venue_intensity_factor = self._resolve_venue_intensity_factor(
+            requested_venue=venue,
+            matched_venue=curve.venue,
+            base_kwh=base_kwh,
+        )
 
         return VenueEnergyProfile(
             requested_venue=venue,
@@ -121,6 +131,32 @@ class EnergyLookupService:
             self._min_temp_f = float(min(all_bins))
             self._max_temp_f = float(max(all_bins))
 
+    def _load_facility_energy_index(self) -> None:
+        path = self._resolve_path(self.facility_energy_csv_path)
+        if path is None or not path.exists():
+            return
+
+        usage_map: dict[str, float] = {}
+        with path.open(newline="", encoding="utf-8-sig") as handle:
+            for row in csv.DictReader(handle):
+                venue = str(row.get("Center Name") or row.get("Venue") or "").strip()
+                usage = self._to_float(row.get("Energy Usage"))
+                if not venue or usage is None:
+                    continue
+                usage_map[self._normalize_venue(venue)] = usage
+
+        if not usage_map:
+            return
+
+        usage_values = list(usage_map.values())
+        usage_min = min(usage_values)
+        usage_max = max(usage_values)
+
+        self._facility_intensity_factors = {
+            venue_key: self._usage_to_intensity_factor(usage=usage, usage_min=usage_min, usage_max=usage_max)
+            for venue_key, usage in usage_map.items()
+        }
+
     @staticmethod
     def _resolve_path(path_value: str | None) -> Path | None:
         if not path_value:
@@ -128,20 +164,19 @@ class EnergyLookupService:
         candidate = Path(path_value).expanduser()
         if candidate.exists():
             return candidate
-        backend_candidate = Path(__file__).resolve().parents[2] / path_value
+        backend_root = Path(__file__).resolve().parents[2]
+        backend_candidate = backend_root / candidate
         if backend_candidate.exists():
             return backend_candidate
+        repo_candidate = backend_root.parent / candidate
+        if repo_candidate.exists():
+            return repo_candidate
         return candidate
 
     def _match_curve(self, venue: str) -> _VenueCurve | None:
-        normalized = self._normalize_venue(venue)
-        if not normalized:
+        candidates = self._candidate_venue_keys(venue)
+        if not candidates:
             return None
-
-        candidates = [normalized]
-        alias = self._aliases_normalized.get(normalized)
-        if alias and alias not in candidates:
-            candidates.insert(0, alias)
 
         for candidate in candidates:
             curve = self._curves.get(candidate)
@@ -160,6 +195,55 @@ class EnergyLookupService:
         if best_match_key is not None:
             return self._curves[best_match_key]
         return None
+
+    def _resolve_venue_intensity_factor(self, requested_venue: str, matched_venue: str | None, base_kwh: float) -> float:
+        if matched_venue:
+            matched_factor = self._match_facility_intensity(matched_venue)
+            if matched_factor is not None:
+                return matched_factor
+
+        requested_factor = self._match_facility_intensity(requested_venue)
+        if requested_factor is not None:
+            return requested_factor
+
+        return (base_kwh / self._base_kwh_median) if self._base_kwh_median > 0 else 1.0
+
+    def _match_facility_intensity(self, venue: str) -> float | None:
+        if not self._facility_intensity_factors:
+            return None
+
+        candidates = self._candidate_venue_keys(venue)
+        for candidate in candidates:
+            factor = self._facility_intensity_factors.get(candidate)
+            if factor is not None:
+                return factor
+
+        best_match_key: str | None = None
+        best_score = 10_000
+        for candidate in candidates:
+            for key in self._facility_intensity_factors:
+                if candidate in key or key in candidate:
+                    score = abs(len(candidate) - len(key))
+                    if score < best_score:
+                        best_score = score
+                        best_match_key = key
+        if best_match_key is not None:
+            return self._facility_intensity_factors[best_match_key]
+        return None
+
+    def _candidate_venue_keys(self, venue: str) -> list[str]:
+        normalized = self._normalize_venue(venue)
+        if not normalized:
+            return []
+
+        candidates = [normalized]
+        alias = self._aliases_normalized.get(normalized)
+        if alias and alias not in candidates:
+            candidates.insert(0, alias)
+        reverse_alias = self._reverse_aliases_normalized.get(normalized)
+        if reverse_alias and reverse_alias not in candidates:
+            candidates.insert(0, reverse_alias)
+        return candidates
 
     def _interpolate(self, curve: _VenueCurve, temperature_f: float) -> tuple[int, int, float]:
         bins_sorted = sorted(curve.bins.keys())
@@ -220,6 +304,14 @@ class EnergyLookupService:
             return float(str(value).strip())
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _usage_to_intensity_factor(usage: float, usage_min: float, usage_max: float) -> float:
+        if usage_max <= usage_min:
+            return 1.0
+        normalized = (usage - usage_min) / (usage_max - usage_min)
+        bounded = max(0.0, min(normalized, 1.0))
+        return 0.6 + (bounded * 1.2)
 
     @staticmethod
     def _fallback_weather_multiplier(temperature_f: float) -> float:

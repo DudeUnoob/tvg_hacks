@@ -1,9 +1,11 @@
 from datetime import datetime
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
+from app.services.event_ingestion import CsvSportsEventsAdapter
 
 
 def test_sync_live_ingests_ut_csv_events_when_external_feeds_fail() -> None:
@@ -57,3 +59,16 @@ def test_sync_live_ingests_ut_csv_events_when_external_feeds_fail() -> None:
     energy_profile = simulation_response.json()["energy_profile"]
     assert energy_profile["source"] == "comprehensive_csv"
     assert energy_profile["matched_venue"] == "Mike A. Myers Stadium"
+
+
+def test_csv_path_resolution_supports_repo_root_from_backend_cwd(monkeypatch) -> None:
+    backend_root = Path(__file__).resolve().parents[1]
+    monkeypatch.chdir(backend_root)
+
+    resolved_events_path = CsvSportsEventsAdapter._resolve_path("data/UT_Sports_Events.csv")
+    resolved_capacity_path = CsvSportsEventsAdapter._resolve_path("data/venues_capacity.csv")
+    resolved_facility_path = CsvSportsEventsAdapter._resolve_path("data/Facility_Energy_Usage.csv")
+
+    assert resolved_events_path is not None and resolved_events_path.exists()
+    assert resolved_capacity_path is not None and resolved_capacity_path.exists()
+    assert resolved_facility_path is not None and resolved_facility_path.exists()
