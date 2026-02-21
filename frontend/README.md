@@ -1,14 +1,14 @@
 # GridPulse Frontend (Layer 1-4 Canvas)
 
-This frontend is wired to backend APIs for all available layers:
+This frontend now runs a live, API-backed Layer 1-4 experience:
 
 - Layer 1: event ingestion visibility + live sync controls
 - Layer 2: crowd confirmation trigger + forecast confidence/attendance
-- Layer 3: real-time map, weather pressure test, urban overlay + 5/10-year simulation
+- Layer 3: real-time **Mapbox** canvas, weather pressure test, urban overlays + 5/10-year simulation
 - Layer 4: dispatch recommendations, reasoning trace, and dispatch payload preview
 - Energy lookup integration: weather simulation + dispatch include backend-derived `energy_profile`, `weather_multiplier`, and venue match/source context
 
-On first load, the UI attempts `POST /events/sync-live`, then hydrates map state, events, forecasts, overlays, and dispatch data.
+On first load, the UI calls `POST /events/sync-live`, then hydrates map state, events, dispatch data, overlays, and forecast context. Core map/dispatch data refresh periodically for a live demo feel.
 
 ## Quick start
 
@@ -24,17 +24,24 @@ Default app URL: `http://127.0.0.1:5173`.
 
 Default backend URL: `http://127.0.0.1:8000`.
 
-Override API base:
+Copy environment template first:
 
 ```bash
-echo "VITE_API_BASE_URL=http://127.0.0.1:8000" > .env.local
+cp .env.example .env.local
 ```
 
-Optional Mapbox token override:
+Then adjust values as needed:
 
 ```bash
-echo "VITE_MAPBOX_TOKEN=your_mapbox_token" >> .env.local
+VITE_API_BASE_URL=http://127.0.0.1:8000
+VITE_MAPBOX_TOKEN=your_mapbox_public_token
 ```
+
+Notes:
+
+- `VITE_API_BASE_URL` is optional; default is `http://127.0.0.1:8000`.
+- `VITE_MAPBOX_TOKEN` is required for full Layer 3 map rendering.
+- If `VITE_MAPBOX_TOKEN` is missing, the app gracefully falls back to an interactive non-map event list.
 
 ## Demo runbook
 
