@@ -1,189 +1,87 @@
-:root {
-  color: #e8ecf4;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  line-height: 1.4;
+@import "tailwindcss";
+
+@theme {
+  --font-inter: "Inter", sans-serif;
+  --font-space: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /*
+   - Taupe: #423629
+   - Olive Leaf: #4F5D2F
+   - Grey Olive: #7D7E75
+   - Pale Slate: #B0B2B8
+   - Lavender: #CFD6EA
+   - Deep Dark: #0A0A0A
+  */
+  --color-taupe: #423629;
+  --color-olive: #4F5D2F;
+  --color-grey-olive: #7D7E75;
+  --color-pale-slate: #B0B2B8;
+  --color-lavender: #CFD6EA;
+  --color-dark: #0A0A0A;
+  --color-dark-panel: #141414;
 }
 
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: #0b1220;
-  color: #e8ecf4;
-}
-
-.app {
-  margin: 0 auto;
-  max-width: 1320px;
-  padding: 20px;
-}
-
-.header {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.ticker {
-  background: #1a2742;
-  border: 1px solid #2a3d66;
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-
-.grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: 2fr 1fr;
-}
-
-.stack {
-  display: grid;
-  gap: 14px;
-}
-
-.card {
-  background: #121b2f;
-  border: 1px solid #223556;
-  border-radius: 12px;
-  padding: 14px;
-}
-
-.card-header {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.map-canvas {
-  background:
-    linear-gradient(to right, rgba(65, 95, 145, 0.2) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(65, 95, 145, 0.2) 1px, transparent 1px),
-    #0f1930;
-  background-size: 24px 24px;
-  border: 1px solid #2f4774;
-  border-radius: 10px;
-  min-height: 360px;
-  position: relative;
-}
-
-.event-node {
-  background: rgba(255, 128, 64, 0.75);
-  border: 2px solid rgba(255, 220, 120, 0.95);
-  border-radius: 999px;
-  cursor: pointer;
-  position: absolute;
-  transform: translate(-50%, -50%);
-}
-
-.event-node.selected {
-  background: rgba(94, 197, 255, 0.9);
-  border-color: #eff9ff;
-}
-
-.legend {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-}
-
-.slider {
-  width: 100%;
-}
-
-.button {
-  background: #284172;
-  border: 1px solid #42639f;
-  border-radius: 8px;
-  color: #fff;
-  cursor: pointer;
-  padding: 7px 10px;
-}
-
-.button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.row {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
-}
-
-.badge {
-  background: #1f3259;
-  border: 1px solid #355285;
-  border-radius: 999px;
-  padding: 4px 10px;
-}
-
-.switch {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-
-.overlay-stats {
-  display: grid;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-
-.dispatch-panel ul {
-  margin: 0;
-  padding-left: 18px;
-}
-
-.dispatch-item {
-  border-top: 1px solid #24365a;
-  margin-top: 12px;
-  padding-top: 12px;
-}
-
-.dispatch-item:first-of-type {
-  border-top: 0;
-  margin-top: 0;
-  padding-top: 0;
-}
-
-.muted {
-  color: #9db0cf;
-  font-size: 0.92rem;
-}
-
-.empty-state {
-  align-items: center;
-  color: #b2c3df;
-  display: flex;
-  inset: 0;
-  justify-content: center;
-  padding: 20px;
-  position: absolute;
-  text-align: center;
-}
-
-.error {
-  background: #3b1a1d;
-  border: 1px solid #73343d;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  padding: 10px;
-}
-
-@media (max-width: 980px) {
-  .grid {
-    grid-template-columns: 1fr;
+@layer base {
+  body {
+    @apply bg-dark text-pale-slate font-inter m-0 p-0 antialiased overflow-x-hidden;
+    /* Strict global grid texture layer */
+    background-image: linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 20px 20px;
   }
 
-  .header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 10px;
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-space tracking-tight text-lavender font-semibold;
   }
+
+  /* Technical hardware panels */
+  .tech-panel {
+    @apply bg-dark-panel border border-white/10 rounded-sm relative overflow-hidden backdrop-blur-md;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+  }
+
+  .tech-panel::before {
+    content: '';
+    @apply absolute inset-0 pointer-events-none border border-white/5 rounded-sm mix-blend-overlay;
+  }
+
+  /* Interaction states for tactile feel */
+  .tech-interactive {
+    @apply transition-all duration-300;
+  }
+
+  .tech-interactive:hover {
+    @apply border-olive scale-[1.02] bg-dark-panel/80;
+    box-shadow: 0 0 15px rgba(79, 93, 47, 0.3), inset 0 0 10px rgba(79, 93, 47, 0.1);
+    z-index: 10;
+  }
+
+  .telemetry-text {
+    @apply font-mono text-sm tracking-widest uppercase;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A0A0A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #423629;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #7D7E75;
 }

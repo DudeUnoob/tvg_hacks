@@ -1,11 +1,14 @@
-# GridPulse Frontend (Minimal Layer 3 + Layer 4 UI)
+# GridPulse Frontend (Layer 1-4 Canvas)
 
-This frontend is a minimal demo canvas for the next GridPulse sections:
+This frontend is wired to backend APIs for all available layers:
 
-- Layer 3 Real-Time mode: event map canvas + ERCOT ticker
-- Layer 3 Weather Pressure Test mode: temperature slider and projected load impacts
-- Layer 3 Urban Planning mode: overlay counts and 5/10-year simulation trigger
-- Layer 4 mode: ranked dispatch recommendations panel
+- Layer 1: event ingestion visibility + live sync controls
+- Layer 2: crowd confirmation trigger + forecast confidence/attendance
+- Layer 3: real-time map, weather pressure test, urban overlay + 5/10-year simulation
+- Layer 4: dispatch recommendations, reasoning trace, and dispatch payload preview
+- Energy lookup integration: weather simulation + dispatch include backend-derived `energy_profile`, `weather_multiplier`, and venue match/source context
+
+On first load, the UI attempts `POST /events/sync-live`, then hydrates map state, events, forecasts, overlays, and dispatch data.
 
 ## Quick start
 
@@ -15,19 +18,25 @@ npm install
 npm run dev
 ```
 
-The app runs by default at `http://127.0.0.1:5173`.
+Default app URL: `http://127.0.0.1:5173`.
 
 ## Backend dependency
 
-The frontend expects backend API at `http://127.0.0.1:8000` by default.
+Default backend URL: `http://127.0.0.1:8000`.
 
-To override:
+Override API base:
 
 ```bash
 echo "VITE_API_BASE_URL=http://127.0.0.1:8000" > .env.local
 ```
 
-## Demo runbook (two terminals)
+Optional Mapbox token override:
+
+```bash
+echo "VITE_MAPBOX_TOKEN=your_mapbox_token" >> .env.local
+```
+
+## Demo runbook
 
 Terminal 1:
 
@@ -43,12 +52,4 @@ Terminal 2:
 cd frontend
 npm install
 npm run dev
-```
-
-If no events appear, ingest sample data from backend terminal:
-
-```bash
-curl -X POST "http://127.0.0.1:8000/events/ingest" \
-  -H "Content-Type: application/json" \
-  --data @tests/fixtures/sample_events.json
 ```

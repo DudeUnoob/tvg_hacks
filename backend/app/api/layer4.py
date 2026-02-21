@@ -9,6 +9,14 @@ from app.schemas.layer4 import ActiveDispatchResponse, DispatchResponse
 router = APIRouter(prefix="/layer4", tags=["layer4"])
 
 
+def _auto_sync_events_if_needed(services) -> None:
+    if not services.settings.auto_sync_live_events:
+        return
+    if services.event_ingestion.list_events():
+        return
+    services.event_ingestion.sync_live_events(force=False)
+
+
 def _ensure_forecast(event: Event, services) -> Forecast:
     crowd_signal = services.latest_signals.get(event.event_id)
     if crowd_signal is None:
@@ -24,17 +32,22 @@ def _ensure_forecast(event: Event, services) -> Forecast:
 def _build_dispatch_for_event(event: Event, services) -> DispatchRecommendation:
     forecast = _ensure_forecast(event, services)
     weather = services.weather_service.get_weather_for_event(event)
-    multiplier = services.weather_service.compute_load_multiplier(weather.temperature_f)
+    energy_profile = services.weather_service.get_event_energy_profile(
+        event=event,
+        temperature_override_f=weather.temperature_f,
+    )
     wave = services.demand_wave_service.project_wave(
         event=event,
         adjusted_attendance=forecast.adjusted_attendance,
-        weather_multiplier=multiplier,
+        weather_multiplier=energy_profile.weather_multiplier,
+        venue_intensity_factor=energy_profile.venue_intensity_factor,
     )
     ercot = services.ercot_service.get_realtime_snapshot()
     recommendation = services.dispatch_engine.generate_recommendation(
         event=event,
         forecast=forecast,
         weather=weather,
+        energy_profile=energy_profile,
         ercot=ercot,
         zip_projections=wave,
     )
@@ -44,6 +57,7 @@ def _build_dispatch_for_event(event: Event, services) -> DispatchRecommendation:
 
 @router.get("/dispatch/active", response_model=ActiveDispatchResponse)
 def get_active_dispatch(services=Depends(get_services)) -> ActiveDispatchResponse:
+    _auto_sync_events_if_needed(services)
     active_events = services.event_ingestion.list_active_events()
     if not active_events:
         active_events = services.event_ingestion.list_events()[:5]

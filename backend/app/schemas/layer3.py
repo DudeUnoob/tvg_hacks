@@ -2,6 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.models.energy import VenueEnergyProfile
 from app.models.layer3 import (
     CapitalProject,
     ErcotSnapshot,
@@ -22,13 +23,14 @@ class MapStateResponse(BaseModel):
 
 class WeatherSimulationRequest(BaseModel):
     event_id: str
-    temperature_f: float = Field(ge=50.0, le=110.0)
+    temperature_f: float = Field(ge=20.0, le=115.0)
 
 
 class WeatherSimulationResponse(BaseModel):
     event_id: str
     temperature_f: float
     weather_multiplier: float
+    energy_profile: VenueEnergyProfile
     projected_peak_mw: float
     forecast: ForecastResponse
     zip_projections: list[ZipLoadProjection]

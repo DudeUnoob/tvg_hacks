@@ -17,6 +17,14 @@ from app.schemas.layer3 import (
 router = APIRouter(prefix="/layer3", tags=["layer3"])
 
 
+def _auto_sync_events_if_needed(services) -> None:
+    if not services.settings.auto_sync_live_events:
+        return
+    if services.event_ingestion.list_events():
+        return
+    services.event_ingestion.sync_live_events(force=False)
+
+
 def _ensure_forecast(event: Event, services) -> Forecast:
     crowd_signal = services.latest_signals.get(event.event_id)
     if crowd_signal is None:
@@ -31,6 +39,7 @@ def _ensure_forecast(event: Event, services) -> Forecast:
 
 @router.get("/map-state", response_model=MapStateResponse)
 def get_map_state(services=Depends(get_services)) -> MapStateResponse:
+    _auto_sync_events_if_needed(services)
     events = services.event_ingestion.list_active_events()
     if not events:
         events = services.event_ingestion.list_events()[:5]
@@ -40,11 +49,15 @@ def get_map_state(services=Depends(get_services)) -> MapStateResponse:
     for event in events:
         forecast = _ensure_forecast(event, services)
         weather = services.weather_service.get_weather_for_event(event)
-        multiplier = services.weather_service.compute_load_multiplier(weather.temperature_f)
+        energy_profile = services.weather_service.get_event_energy_profile(
+            event=event,
+            temperature_override_f=weather.temperature_f,
+        )
         zip_projections = services.demand_wave_service.project_wave(
             event=event,
             adjusted_attendance=forecast.adjusted_attendance,
-            weather_multiplier=multiplier,
+            weather_multiplier=energy_profile.weather_multiplier,
+            venue_intensity_factor=energy_profile.venue_intensity_factor,
         )
         heat_ratio = forecast.adjusted_attendance / max(event.baseline_attendance, 1)
         map_events.append(
@@ -59,6 +72,7 @@ def get_map_state(services=Depends(get_services)) -> MapStateResponse:
                 confidence=forecast.confidence,
                 projected_dispersal_peak=event.projected_dispersal_peak,
                 heat_intensity=min(max(heat_ratio, 0.1), 1.0),
+                weather_multiplier=energy_profile.weather_multiplier,
                 wave_zip_codes=[item.zip_code for item in zip_projections],
             )
         )
@@ -74,17 +88,22 @@ def simulate_weather(payload: WeatherSimulationRequest, services=Depends(get_ser
 
     forecast = _ensure_forecast(event, services)
     weather = services.weather_service.get_weather_for_event(event, temperature_override_f=payload.temperature_f)
-    weather_multiplier = services.weather_service.compute_load_multiplier(weather.temperature_f)
+    energy_profile = services.weather_service.get_event_energy_profile(
+        event=event,
+        temperature_override_f=weather.temperature_f,
+    )
     zip_projections = services.demand_wave_service.project_wave(
         event=event,
         adjusted_attendance=forecast.adjusted_attendance,
-        weather_multiplier=weather_multiplier,
+        weather_multiplier=energy_profile.weather_multiplier,
+        venue_intensity_factor=energy_profile.venue_intensity_factor,
     )
 
     return WeatherSimulationResponse(
         event_id=event.event_id,
         temperature_f=weather.temperature_f,
-        weather_multiplier=weather_multiplier,
+        weather_multiplier=energy_profile.weather_multiplier,
+        energy_profile=energy_profile,
         projected_peak_mw=services.demand_wave_service.peak_mw(zip_projections),
         forecast=ForecastResponse.model_validate(forecast.model_dump()),
         zip_projections=zip_projections,

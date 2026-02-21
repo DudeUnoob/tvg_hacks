@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from app.config import Settings
 from app.models.dispatch import DispatchRecommendation, DispatchTarget
+from app.models.energy import VenueEnergyProfile
 from app.models.event import Event
 from app.models.forecast import Forecast
 from app.models.layer3 import ErcotSnapshot, WeatherSnapshot, ZipLoadProjection
@@ -17,6 +18,7 @@ class DispatchEngine:
         event: Event,
         forecast: Forecast,
         weather: WeatherSnapshot,
+        energy_profile: VenueEnergyProfile,
         ercot: ErcotSnapshot,
         zip_projections: list[ZipLoadProjection],
     ) -> DispatchRecommendation:
@@ -45,7 +47,11 @@ class DispatchEngine:
         reasoning = (
             f"{event.name}: attendance {forecast.adjusted_attendance} with "
             f"{forecast.confidence * 100:.1f}% confidence. Temp {weather.temperature_f:.1f}F. "
-            f"{comparable}. Prioritize zip codes {', '.join(target.zip_code for target in targets)} "
+            f"{comparable}. Energy lookup: {energy_profile.source} "
+            f"(matched venue: {energy_profile.matched_venue or 'unmatched'}, "
+            f"weather multiplier: {energy_profile.weather_multiplier:.3f}, "
+            f"venue intensity: {energy_profile.venue_intensity_factor:.3f}). "
+            f"Prioritize zip codes {', '.join(target.zip_code for target in targets)} "
             f"starting {lead_hours}h before dispersal peak."
         )
 
@@ -57,8 +63,10 @@ class DispatchEngine:
             lead_time_hours=lead_hours,
             confidence=forecast.confidence,
             temperature_f=weather.temperature_f,
+            weather_multiplier=energy_profile.weather_multiplier,
             revenue_estimate_usd=revenue_estimate_usd,
             comparable_signal=comparable,
             reasoning_trace=reasoning,
+            energy_profile=energy_profile,
             targets=targets,
         )

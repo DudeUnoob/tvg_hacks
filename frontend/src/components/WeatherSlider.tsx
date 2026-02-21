@@ -12,14 +12,16 @@ export function WeatherSlider({
   disabled = false,
 }: WeatherSliderProps) {
   return (
-    <section className="card">
-      <div className="card-header">
-        <h2>Weather Pressure Test</h2>
-        <span className="badge">{temperatureF.toFixed(0)} F</span>
+    <section className="panel-hardware rounded-xl border border-white/10 p-5">
+      <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
+        <h2 className="font-mono text-sm tracking-widest text-[#00E5FF]">Weather Pressure Test</h2>
+        <span className="rounded-full border border-white/20 bg-black/40 px-3 py-1 font-mono text-xs">
+          {temperatureF.toFixed(0)} F
+        </span>
       </div>
       <input
         aria-label="Temperature slider"
-        className="slider"
+        className="w-full accent-[#FF5A7A]"
         disabled={disabled}
         max={110}
         min={50}
@@ -27,12 +29,17 @@ export function WeatherSlider({
         type="range"
         value={temperatureF}
       />
-      <div className="row">
-        <span className="muted">50 F</span>
-        <button className="button" disabled={disabled} onClick={onWorstCase} type="button">
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <span className="font-mono text-xs text-white/55">50 F</span>
+        <button
+          className="rounded border border-[#FF5A7A]/70 px-3 py-1.5 text-xs font-mono text-[#FF5A7A] hover:bg-[#FF5A7A]/15 disabled:opacity-50"
+          disabled={disabled}
+          onClick={onWorstCase}
+          type="button"
+        >
           Worst Case (102 F)
         </button>
-        <span className="muted">110 F</span>
+        <span className="font-mono text-xs text-white/55">110 F</span>
       </div>
     </section>
   );

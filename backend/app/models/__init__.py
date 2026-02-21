@@ -1,5 +1,6 @@
 from app.models.dispatch import DispatchRecommendation, DispatchTarget
 from app.models.crowd_signal import CrowdSignal
+from app.models.energy import VenueEnergyProfile
 from app.models.event import Event
 from app.models.forecast import Forecast
 from app.models.layer3 import (
@@ -19,6 +20,7 @@ __all__ = [
     "Forecast",
     "DispatchRecommendation",
     "DispatchTarget",
+    "VenueEnergyProfile",
     "WeatherSnapshot",
     "ErcotSnapshot",
     "ZipLoadProjection",

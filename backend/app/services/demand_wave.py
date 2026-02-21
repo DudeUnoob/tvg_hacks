@@ -17,10 +17,13 @@ class DemandWaveService:
         event: Event,
         adjusted_attendance: int,
         weather_multiplier: float,
+        venue_intensity_factor: float = 1.0,
     ) -> list[ZipLoadProjection]:
         zip_weights = self._resolve_zip_weights(event.venue)
         base_kw_per_person = 0.0033
-        total_delta_mw = (adjusted_attendance * base_kw_per_person * weather_multiplier) / 1000.0
+        total_delta_mw = (
+            adjusted_attendance * base_kw_per_person * weather_multiplier * venue_intensity_factor
+        ) / 1000.0
 
         projections: list[ZipLoadProjection] = []
         for index, (zip_code, weight) in enumerate(zip_weights):

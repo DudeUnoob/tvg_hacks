@@ -31,7 +31,7 @@ def _ingest_dispatch_event(client: TestClient) -> str:
 
 
 def test_layer4_dispatch_endpoints_return_ranked_targets() -> None:
-    app = create_app(Settings(mock_mode=True))
+    app = create_app(Settings(mock_mode=True, weather_source="mock", ercot_source="mock"))
     client = TestClient(app)
     event_id = _ingest_dispatch_event(client)
 
@@ -47,11 +47,22 @@ def test_layer4_dispatch_endpoints_return_ranked_targets() -> None:
     assert recommendation["event_id"] == event_id
     assert recommendation["revenue_estimate_usd"] >= 0
     assert recommendation["lead_time_hours"] == 2
+    assert recommendation["weather_multiplier"] > 0
+    assert recommendation["energy_profile"]["source"] in {"comprehensive_csv", "fallback_curve"}
+    assert recommendation["energy_profile"]["weather_multiplier"] == recommendation["weather_multiplier"]
     assert "Layer 4 Dispatch Event" in recommendation["reasoning_trace"]
+    assert "Energy lookup:" in recommendation["reasoning_trace"]
 
 
 def test_layer4_dispatch_graceful_when_camera_frames_unavailable() -> None:
-    app = create_app(Settings(mock_mode=True, mock_empty_frames=True))
+    app = create_app(
+        Settings(
+            mock_mode=True,
+            mock_empty_frames=True,
+            weather_source="mock",
+            ercot_source="mock",
+        )
+    )
     client = TestClient(app)
     event_id = _ingest_dispatch_event(client)
 
@@ -59,4 +70,5 @@ def test_layer4_dispatch_graceful_when_camera_frames_unavailable() -> None:
     assert response.status_code == 200
     recommendation = response.json()["recommendation"]
     assert recommendation["event_id"] == event_id
+    assert recommendation["energy_profile"]["source"] in {"comprehensive_csv", "fallback_curve"}
     assert len(recommendation["targets"]) > 0

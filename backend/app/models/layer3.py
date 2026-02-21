@@ -36,6 +36,7 @@ class MapEventState(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     projected_dispersal_peak: datetime
     heat_intensity: float = Field(ge=0.0, le=1.0)
+    weather_multiplier: float = Field(ge=0.0)
     wave_zip_codes: list[str]
 
 

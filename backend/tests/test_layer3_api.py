@@ -31,7 +31,7 @@ def _ingest_active_event(client: TestClient) -> str:
 
 
 def test_layer3_map_state_and_weather_simulation() -> None:
-    app = create_app(Settings(mock_mode=True))
+    app = create_app(Settings(mock_mode=True, weather_source="mock", ercot_source="mock"))
     client = TestClient(app)
     event_id = _ingest_active_event(client)
 
@@ -40,6 +40,7 @@ def test_layer3_map_state_and_weather_simulation() -> None:
     map_state = map_state_response.json()
     assert map_state["ercot"]["price_mwh"] > 0
     assert len(map_state["events"]) > 0
+    assert map_state["events"][0]["weather_multiplier"] > 0
 
     simulate_response = client.post(
         "/layer3/simulate",
@@ -48,12 +49,14 @@ def test_layer3_map_state_and_weather_simulation() -> None:
     assert simulate_response.status_code == 200
     simulation = simulate_response.json()
     assert simulation["temperature_f"] == 101
-    assert simulation["weather_multiplier"] >= 1.2
+    assert simulation["weather_multiplier"] > 0
+    assert simulation["energy_profile"]["source"] in {"comprehensive_csv", "fallback_curve"}
+    assert simulation["weather_multiplier"] == simulation["energy_profile"]["weather_multiplier"]
     assert len(simulation["zip_projections"]) > 0
 
 
 def test_layer3_urban_overlays_and_simcity_simulation() -> None:
-    app = create_app(Settings(mock_mode=True))
+    app = create_app(Settings(mock_mode=True, weather_source="mock", ercot_source="mock"))
     client = TestClient(app)
 
     overlays_response = client.get("/layer3/urban-overlays")

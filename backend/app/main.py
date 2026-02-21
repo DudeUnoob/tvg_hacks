@@ -15,8 +15,15 @@ from app.models.forecast import Forecast
 from app.services.crowd_fusion import CrowdFusionService
 from app.services.demand_wave import DemandWaveService
 from app.services.dispatch_engine import DispatchEngine
+from app.services.energy_lookup import EnergyLookupService
 from app.services.ercot_service import ErcotService
-from app.services.event_ingestion import EventIngestionService
+from app.services.event_ingestion import (
+    CsvSportsEventsAdapter,
+    EventIngestionService,
+    LocalistEventsAdapter,
+    MoodyCenterWebAdapter,
+    TicketmasterDiscoveryAdapter,
+)
 from app.services.frame_provider import MockFrameProvider
 from app.services.urban_planning import UrbanPlanningService
 from app.services.vlm_gemini import GeminiCrowdEstimator
@@ -30,6 +37,7 @@ class ServiceContainer:
     frame_provider: MockFrameProvider
     vlm_estimator: GeminiCrowdEstimator
     crowd_fusion: CrowdFusionService
+    energy_lookup_service: EnergyLookupService
     weather_service: WeatherService
     ercot_service: ErcotService
     demand_wave_service: DemandWaveService
@@ -41,13 +49,56 @@ class ServiceContainer:
 
 
 def build_services(settings: Settings) -> ServiceContainer:
+    live_adapters = []
+    if settings.csv_events_enabled and settings.ut_sports_csv_path:
+        live_adapters.append(
+            CsvSportsEventsAdapter(
+                events_csv_path=settings.ut_sports_csv_path,
+                venues_capacity_csv_path=settings.venues_capacity_csv_path,
+                facility_energy_csv_path=settings.facility_energy_csv_path,
+            )
+        )
+    live_adapters.extend(
+        [
+            LocalistEventsAdapter(
+                api_url=settings.ut_localist_api_url,
+                source_name="ut_localist_dkr",
+                search_term="Darrell K Royal",
+                results_per_page=settings.localist_results_per_page,
+                keyword_filters=["darrell", "stadium", "football", "longhorns"],
+            ),
+            LocalistEventsAdapter(
+                api_url=settings.ut_localist_api_url,
+                source_name="ut_localist_moody",
+                search_term="Moody Center",
+                results_per_page=settings.localist_results_per_page,
+                keyword_filters=["moody", "basketball", "concert", "spurs", "longhorns"],
+            ),
+            MoodyCenterWebAdapter(events_url=settings.moody_events_url),
+        ]
+    )
+    if settings.ticketmaster_api_key:
+        live_adapters.append(
+            TicketmasterDiscoveryAdapter(
+                api_url=settings.ticketmaster_api_url,
+                api_key=settings.ticketmaster_api_key,
+            )
+        )
+
+    energy_lookup_service = EnergyLookupService(settings=settings)
+
     return ServiceContainer(
         settings=settings,
-        event_ingestion=EventIngestionService(default_radius_meters=settings.default_event_radius_meters),
+        event_ingestion=EventIngestionService(
+            default_radius_meters=settings.default_event_radius_meters,
+            live_sync_interval_seconds=settings.live_event_sync_interval_seconds,
+            live_adapters=live_adapters,
+        ),
         frame_provider=MockFrameProvider(settings=settings),
         vlm_estimator=GeminiCrowdEstimator(settings=settings),
         crowd_fusion=CrowdFusionService(),
-        weather_service=WeatherService(settings=settings),
+        energy_lookup_service=energy_lookup_service,
+        weather_service=WeatherService(settings=settings, energy_lookup_service=energy_lookup_service),
         ercot_service=ErcotService(settings=settings),
         demand_wave_service=DemandWaveService(),
         urban_planning_service=UrbanPlanningService(),

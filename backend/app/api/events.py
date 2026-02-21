@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 
 from app.api.deps import get_services
 from app.models.event import Event
@@ -14,6 +15,12 @@ from app.schemas.events import (
 router = APIRouter(prefix="/events", tags=["events"])
 
 
+class EventSyncResponse(BaseModel):
+    ingested_count: int
+    events: list[EventResponse]
+    force: bool
+
+
 def _to_event_response(event: Event) -> EventResponse:
     payload = event.model_dump(exclude={"ingested_at"})
     return EventResponse.model_validate(payload)
@@ -25,6 +32,19 @@ def ingest_events(payload: EventIngestRequest, services=Depends(get_services)) -
     return EventIngestResponse(
         ingested_count=len(ingested),
         events=[_to_event_response(event) for event in ingested],
+    )
+
+
+@router.post("/sync-live", response_model=EventSyncResponse)
+def sync_live_events(
+    force: bool = Query(default=False),
+    services=Depends(get_services),
+) -> EventSyncResponse:
+    ingested = services.event_ingestion.sync_live_events(force=force)
+    return EventSyncResponse(
+        ingested_count=len(ingested),
+        events=[_to_event_response(event) for event in ingested],
+        force=force,
     )
 
 
